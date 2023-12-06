@@ -1,0 +1,19 @@
+# @package _global_
+
+defaults:
+  - experiment.yaml
+  - override /benchmark: split_imagenet.yaml
+  - override /scheduler: null.yaml
+  - override /optimizer: sgd.yaml
+  - override /model: resnet50.yaml
+  - _self_
+
+evaluation:
+  num_gpus: 0.5
+  num_cpus: 4
+  num_actors: 4
+
+strategy:
+  train_epochs: 5
+  train_mb_size: 64
+  mem_size: 20000

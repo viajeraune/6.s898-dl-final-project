@@ -1,0 +1,5 @@
+# @package _global_
+optimizer:
+  lr: 0.0817694849118531
+strategy:
+  temperature: 0.17532258875378776
