@@ -1,0 +1,39 @@
+-- >> Start of training phase << --
+-- >> Start of eval phase << --
+-- Starting eval on experience 0 (Task 0) from train stream --
+> Eval on experience 0 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp000 = 0.6000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp000 = 11366153.8730
+-- Starting eval on experience 1 (Task 0) from train stream --
+> Eval on experience 1 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp001 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp001 = 11366154.0439
+-- Starting eval on experience 2 (Task 0) from train stream --
+> Eval on experience 2 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp002 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp002 = 11366154.2148
+-- Starting eval on experience 3 (Task 0) from train stream --
+> Eval on experience 3 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp003 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp003 = 11367127.2070
+-- Starting eval on experience 4 (Task 0) from train stream --
+> Eval on experience 4 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp004 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp004 = 11366154.5566
+-- Starting eval on experience 5 (Task 0) from train stream --
+> Eval on experience 5 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp005 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp005 = 11366154.7275
+-- Starting eval on experience 6 (Task 0) from train stream --
+> Eval on experience 6 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp006 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp006 = 11366154.8984
+-- Starting eval on experience 7 (Task 0) from train stream --
+> Eval on experience 7 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp007 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp007 = 11366155.0693
+-- Starting eval on experience 8 (Task 0) from train stream --
+> Eval on experience 8 (Task 0) from train stream ended.
+	CPUUsage_Exp/eval_phase/train_stream/Task000/Exp008 = 0.5000
+	DiskUsage_Exp/eval_phase/train_stream/Task000/Exp008 = 11366155.2402
+-- Starting eval on experience 9 (Task 0) from train stream --

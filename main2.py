@@ -33,23 +33,24 @@ from avalanche.benchmarks.scenarios import OnlineCLScenario
 from avalanche.training.plugins.lr_scheduling import LRSchedulerPlugin
 # from avalanche.benchmarks.classic.clear import CLEAR, CLEARMetric # clear
 
-
 # Define hyperparameters/scheduler/augmentation
 HPARAM = {
     "num_experiences": 5,
     "mem_size": 200,
-    "batch_size": 10, #mb_size
+    "train_mb_size": 64, 
+    "eval_mb_size": 256,
     "num_epoch": 3,
     "step_scheduler_decay": 30,
     "scheduler_step": 0.1,
     "start_lr": 0.01,
     "weight_decay": 1e-5,
     "momentum": 0.9,
+    "num_workers": 1,
 }
 
 
-split_cifar10 = benchmark_factory.create_benchmark("split_cifar10", n_experiences=HPARAM["num_experiences"], val_size=0.2, seed=1)
-# split_cifar100 = benchmark_factory.create_benchmark("split_cifar100", n_experiences=20, val_size=0.2, seed=1), #n_experiences are same as ocl_survey
+split_cifar10 = benchmark_factory.create_benchmark("split_cifar10", n_experiences=HPARAM["num_experiences"], val_size=0.05, seed=1, return_task_id=False, class_ids_from_zero_from_first_exp=True)
+# split_cifar100 = benchmark_factory.create_benchmark("split_cifar100", n_experiences=HPARAM["num_experiences"], val_size=0.05, seed=1), #n_experiences are same as ocl_survey
 # split_miniimagenet = benchmark_factory.create_benchmark("split_miniimagenet", dataset_root=Path("/data"), n_experiences=20), #n_experiences are same as ocl_survey
 # split_imagenet = benchmark_factory.create_benchmark("split_imagenet", n_experiences=100), #n_experiences are same as ocl_survey
 
@@ -160,25 +161,24 @@ def main():
     model = model.to(device)
 
     scenario = split_cifar10
-
     # log to Tensorboard
     tb_logger = TensorboardLogger()
 
     # log to text file
-    text_logger = TextLogger(open('log.txt', 'a'))
+    text_logger = TextLogger(open('log.txt', 'w+'))
 
     # print to stdout
     interactive_logger = InteractiveLogger()
 
     eval_plugin = EvaluationPlugin(
-        accuracy_metrics(minibatch=True, epoch=True, experience=True, stream=True),
-        loss_metrics(minibatch=True, epoch=True, experience=True, stream=True),
-        timing_metrics(epoch=True, epoch_running=True),
+        accuracy_metrics(minibatch=False, epoch=True, experience=False, stream=True),
+        loss_metrics(minibatch=False, epoch=True, experience=False, stream=True),
+        timing_metrics(epoch=True, epoch_running=False),
         forgetting_metrics(experience=True, stream=True),
         cpu_usage_metrics(experience=True),
-        confusion_matrix_metrics(num_classes=NUM_CLASSES[DATASET_NAME],  normalize=None, save_image=False,
-                                stream=True),
-        disk_usage_metrics(minibatch=True, epoch=True, experience=True, stream=True),
+        # confusion_matrix_metrics(num_classes=NUM_CLASSES[DATASET_NAME],  normalize=None, save_image=False,
+        #                         stream=True),
+        disk_usage_metrics(minibatch=False, epoch=True, experience=True, stream=True),
         loggers=[interactive_logger, text_logger, tb_logger]
     )
 
@@ -197,7 +197,9 @@ def main():
         HPARAM["scheduler_step"],
     )
 
-    plugin_list = [LRSchedulerPlugin(scheduler)]
+    plugin_list = [LRSchedulerPlugin(scheduler), EarlyStoppingPlugin(patience=10, val_stream_name='train')]
+
+    criterion = torch.nn.CrossEntropyLoss()
 
     # exp_name = (
     #     config.strategy.name
@@ -239,24 +241,37 @@ def main():
     strategy = Replay(
         model,
         optimizer,
-        criterion=torch.nn.CrossEntropyLoss(),
+        criterion=criterion,
         mem_size=HPARAM["mem_size"],
-        train_mb_size=HPARAM["batch_size"],
+        train_mb_size=HPARAM["train_mb_size"],
         train_epochs=HPARAM["num_epoch"],
-        eval_mb_size=HPARAM["batch_size"],
+        eval_mb_size=HPARAM["eval_mb_size"],
         evaluator=eval_plugin,
         device=device,
         plugins=plugin_list,
         eval_every=0 # evaluation frequency. If 0, evaluate after each experience
     )
 
+    # strategy = EWC(
+    #     model=model,
+    #     optimizer=optimizer,
+    #     criterion=criterion,
+    #     train_mb_size=HPARAM["train_mb_size"],
+    #     train_epochs=3,
+    #     eval_mb_size=HPARAM["eval_mb_size"],
+    #     device=device,
+    #     evaluator=eval_plugin,
+    #     plugins=plugin_list,
+    #     ewc_lambda=0.4,
+    # )
+
     # strategy = Naive(
     #     model,
     #     optimizer,
-    #     criterion=torch.nn.CrossEntropyLoss(),
-    #     train_mb_size=HPARAM["batch_size"],
+    #     criterion=criterion,
+    #     train_mb_size=HPARAM["train_mb_size"],
     #     train_epochs=HPARAM["num_epoch"],
-    #     eval_mb_size=HPARAM["batch_size"],
+    #     eval_mb_size=HPARAM["eval_mb_size"],
     #     evaluator=eval_plugin,
     #     device=device,
     #     plugins=plugin_list,
@@ -265,7 +280,7 @@ def main():
     print("Using strategy: ", strategy.__class__.__name__)
     print("With plugins: ", strategy.plugins)
 
-    is_online = False
+    is_online = True
 
     # Training loop
     # For CIFAR100, need to indicate [0] to each scenario instance to get the first experience
@@ -276,18 +291,18 @@ def main():
             ocl_scenario = OnlineCLScenario(
                 original_streams=batch_streams,
                 experiences=experience,
-                experience_size=1,
+                experience_size=HPARAM["train_mb_size"],
                 access_task_boundaries=False,
+                shuffle=True,
             )
             train_stream = ocl_scenario.train_stream
-            print(train_stream)
         else:
             train_stream = experience
 
         strategy.train(
             train_stream,
             # eval_streams=[scenario.valid_stream[: t + 1]],
-            num_workers=0,
+            num_workers=HPARAM["num_workers"],
             drop_last=True,
         )
 
@@ -295,8 +310,8 @@ def main():
         #     strategy.model.state_dict(), os.path.join(logdir, f"model_{t}.ckpt")
         # )
 
-        strategy.eval(scenario.test_stream[: t + 1])
-    results = strategy.eval(scenario.test_stream)
+        results = strategy.eval(scenario.test_stream[: t + 1])
+    # results = strategy.eval(scenario.test_stream)
 
     # Extract images from the validation set
     selected_images, selected_labels = extract_images_from_validation_set(scenario)
