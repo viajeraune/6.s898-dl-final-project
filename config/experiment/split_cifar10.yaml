@@ -7,7 +7,7 @@ defaults:
   - override /benchmark: split_cifar10.yaml
   - override /scheduler: null.yaml
   - override /optimizer: sgd.yaml
-  - override /model: slimresnet18.yaml
+  - override /model: resnet18.yaml
   - _self_
 
 evaluation:
@@ -18,4 +18,6 @@ evaluation:
 strategy:
   train_epochs: 3
   train_mb_size: 10
-  mem_size: 200
+  mem_size: 500
+
+# added by me

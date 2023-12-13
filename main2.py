@@ -13,6 +13,8 @@ import src.factories.benchmark_factory as benchmark_factory
 import src.factories.method_factory as method_factory
 import src.factories.model_factory as model_factory
 import src.toolkit.utils as utils
+from src.toolkit.json_logger import JSONLogger
+
 
 from torch.optim import SGD
 from torch.nn import CrossEntropyLoss
@@ -31,7 +33,6 @@ from avalanche.benchmarks.scenarios import OnlineCLScenario
 
 
 from avalanche.training.plugins.lr_scheduling import LRSchedulerPlugin
-# from avalanche.benchmarks.classic.clear import CLEAR, CLEARMetric # clear
 
 # Define hyperparameters/scheduler/augmentation
 HPARAM = {
@@ -45,7 +46,7 @@ HPARAM = {
     "start_lr": 0.01,
     "weight_decay": 1e-5,
     "momentum": 0.9,
-    "num_workers": 1,
+    "num_workers": 2,
 }
 
 
@@ -53,11 +54,6 @@ split_cifar10 = benchmark_factory.create_benchmark("split_cifar10", n_experience
 # split_cifar100 = benchmark_factory.create_benchmark("split_cifar100", n_experiences=HPARAM["num_experiences"], val_size=0.05, seed=1), #n_experiences are same as ocl_survey
 # split_miniimagenet = benchmark_factory.create_benchmark("split_miniimagenet", dataset_root=Path("/data"), n_experiences=20), #n_experiences are same as ocl_survey
 # split_imagenet = benchmark_factory.create_benchmark("split_imagenet", n_experiences=100), #n_experiences are same as ocl_survey
-
-# scenarios = [split_cifar100, split_miniimagenet, split_imagenet]
-
-# split_cifar10_benchmark = SplitCIFAR10(n_experiences=HPARAM["num_experiences"], return_task_id=True, seed=1)
-# print(split_cifar10_benchmark)
 
 
 DATASET_NAME = "split_cifar10"
@@ -150,38 +146,37 @@ def make_scheduler(optimizer, step_size, gamma=0.1):
     )
     return scheduler
 
-# import hydra
-# @hydra.main(config_path="config", config_name="config.yaml")
 
 def main():
-    # utils.set_seed(config.experiment.seed)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     model = model_factory.create_model("resnet18", input_size=(32, 32, 3))
     model = model.to(device)
 
     scenario = split_cifar10
-    # log to Tensorboard
-    tb_logger = TensorboardLogger()
 
-    # log to text file
-    text_logger = TextLogger(open('log.txt', 'w+'))
-
-    # print to stdout
-    interactive_logger = InteractiveLogger()
-
-    eval_plugin = EvaluationPlugin(
-        accuracy_metrics(minibatch=False, epoch=True, experience=False, stream=True),
-        loss_metrics(minibatch=False, epoch=True, experience=False, stream=True),
-        timing_metrics(epoch=True, epoch_running=False),
-        forgetting_metrics(experience=True, stream=True),
-        cpu_usage_metrics(experience=True),
-        # confusion_matrix_metrics(num_classes=NUM_CLASSES[DATASET_NAME],  normalize=None, save_image=False,
-        #                         stream=True),
-        disk_usage_metrics(minibatch=False, epoch=True, experience=True, stream=True),
-        loggers=[interactive_logger, text_logger, tb_logger]
+    exp_name = (
+        "experiment1"
     )
 
+    # set log directory
+    logdir = os.path.join(
+        "../results",
+        exp_name,
+    )
+
+    os.makedirs(logdir, exist_ok=True)
+    utils.clear_tensorboard_files(logdir)
+
+    metrics = ["accuracy_metrics", "cumulative_accuracy", "loss_metrics", "clock", "time"]
+
+    evaluator, parallel_eval_plugin = method_factory.create_evaluator(
+        metrics,
+        logdir,
+        loggers_strategy=["interactive", "tensorboard", "text", "json"],
+        loggers_parallel=["json"],
+        parallel_evaluation=True,
+    )
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -197,47 +192,10 @@ def main():
         HPARAM["scheduler_step"],
     )
 
-    plugin_list = [LRSchedulerPlugin(scheduler), EarlyStoppingPlugin(patience=10, val_stream_name='train')]
+    plugin_list = [LRSchedulerPlugin(scheduler), parallel_eval_plugin, EarlyStoppingPlugin(patience=10, val_stream_name='train')]
 
     criterion = torch.nn.CrossEntropyLoss()
-
-    # exp_name = (
-    #     config.strategy.name
-    #     + "_"
-    #     + config.benchmark.factory_args.benchmark_name
-    #     + "_"
-    #     + str(config.benchmark.factory_args.n_experiences)
-    #     + "_"
-    #     + str(config.strategy.mem_size)
-    # )
-
-    # logdir = os.path.join(
-    #     str(config.experiment.results_root),
-    #     exp_name,
-    #     str(config.experiment.seed),
-    # )
-    # if config.experiment.logdir is None:
-    #     os.makedirs(logdir, exist_ok=True)
-    #     utils.clear_tensorboard_files(logdir)
-
-    #     # Add full results dir to config
-    #     config.experiment.logdir = logdir
-    #     import omegaconf
-    #     omegaconf.OmegaConf.save(config, os.path.join(logdir, "config.yaml"))
-    # else:
-    #     logdir = config.experiment.logdir
         
-    # strategy = method_factory.create_strategy(
-    #     model=model,
-    #     optimizer=optimizer,
-    #     plugins=plugin_list,
-    #     # logdir=logdir,
-    #     name="er",
-    #     dataset_name="split_cifar10",
-    #     strategy_kwargs=config["strategy"],
-    #     evaluation_kwargs=config["evaluation"],
-    # )
-
     strategy = Replay(
         model,
         optimizer,
@@ -246,10 +204,10 @@ def main():
         train_mb_size=HPARAM["train_mb_size"],
         train_epochs=HPARAM["num_epoch"],
         eval_mb_size=HPARAM["eval_mb_size"],
-        evaluator=eval_plugin,
+        evaluator=evaluator,
         device=device,
         plugins=plugin_list,
-        eval_every=0 # evaluation frequency. If 0, evaluate after each experience
+        # eval_every=0 # evaluation frequency. If 0, evaluate after each experience. If -1 (default), never evaluate
     )
 
     # strategy = EWC(
@@ -301,7 +259,7 @@ def main():
 
         strategy.train(
             train_stream,
-            # eval_streams=[scenario.valid_stream[: t + 1]],
+            eval_streams=[scenario.valid_stream[: t + 1]],
             num_workers=HPARAM["num_workers"],
             drop_last=True,
         )

@@ -3,8 +3,8 @@ defaults:
   - scheduler: null
   - optimizer: null
   - model: null
-  - strategy: null
+  - strategy: method_defaults.yaml
   - evaluation: evaluation.yaml
   - deploy: default.yaml
-  - experiment: split_cifar100.yaml
+  - experiment: split_cifar10.yaml
   - hydra.yaml
